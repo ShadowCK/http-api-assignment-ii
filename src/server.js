@@ -1,37 +1,41 @@
 // Import modules
-const http = require("http");
-const url = require("url");
-const query = require("querystring");
+const http = require('http');
+const url = require('url');
 // Import scripts
-const htmlHandler = require("./htmlResponses.js");
-const jsonHandler = require("./jsonResponses.js");
+const htmlHandler = require('./htmlResponses.js');
+const jsonHandler = require('./jsonResponses.js');
 
 const port = process.env.PORT || process.env.NODE_PORT || 3000;
 
 const urlStruct = {
   json: {
     GET: {
-      "/success": jsonHandler.getSuccess,
-      "/badRequest": jsonHandler.getBadRequest,
-      "/unauthorized": jsonHandler.getUnauthorized,
-      "/forbidden": jsonHandler.getForbidden,
-      "/internal": jsonHandler.getInternal,
-      "/notImplemented": jsonHandler.getNotImplemented,
+      '/getUsers': jsonHandler.getUsersGET,
+      '/notReal': jsonHandler.notRealGET,
+    },
+    HEAD: {
+      '/getUsers': jsonHandler.getUsersHEAD,
+      '/notReal': jsonHandler.notRealHEAD,
+    },
+    POST: {
+      '/addUser': jsonHandler.addUserPOST,
     },
   },
   html: {
     GET: {
-      "/": htmlHandler.getIndex,
-      "/style.css": htmlHandler.getCSS,
+      '/': htmlHandler.getIndex,
+      '/style.css': htmlHandler.getCSS,
+      '/getUsers': jsonHandler.getUsersGET,
+      '/notReal': jsonHandler.notRealGET,
     },
   },
   default: jsonHandler.getNotFound,
 };
 
 const MIMETypeToHandlerMapping = {
-  "application/json": "json",
-  "text/html": "html",
-  "text/css": "html",
+  'application/json': 'json',
+  'text/html': 'html',
+  'text/css': 'html',
 };
 
 const onRequest = (request, response) => {
@@ -39,42 +43,59 @@ const onRequest = (request, response) => {
   const parsedUrl = url.parse(request.url);
   // Grab useful data
   const { pathname } = parsedUrl;
-  const params = query.parse(parsedUrl.query);
 
   // Check Accept header to determine response format, default to json
-  const acceptHeader = request.headers.accept || "application/json";
-  const acceptedTypes = acceptHeader.split(",");
-  console.log("pathname", pathname);
-  console.log("types", acceptedTypes);
+  const acceptHeader = request.headers.accept || 'application/json';
+  const acceptedTypes = acceptHeader.split(',');
 
-  const method = request.method;
+  const { method } = request;
 
   let handler = null;
-  for (let type of acceptedTypes.map((type) => MIMETypeToHandlerMapping[type] || type)) {
-    // Invalid type
-    if (!urlStruct[type]) {
-      continue;
-    }
-    const handlerMap = urlStruct[type][method];
-    // Invalid method
-    if (!handlerMap) {
-      continue;
-    }
-    let _handler = handlerMap[pathname];
-    // Found handler
-    if (_handler instanceof Function) {
-      handler = _handler;
-      break; // Bail out
-    }
-  }
+  // Original code
+  // for (const type of acceptedTypes.map((_type) => MIMETypeToHandlerMapping[_type] || _type)) {
+  //   // Invalid type
+  //   if (!urlStruct[type]) {
+  //     continue;
+  //   }
+  //   const handlerMap = urlStruct[type][method];
+  //   // Invalid method
+  //   if (!handlerMap) {
+  //     continue;
+  //   }
+  //   const _handler = handlerMap[pathname];
+  //   // Found handler
+  //   if (_handler instanceof Function) {
+  //     handler = _handler;
+  //     break; // Bail out
+  //   }
+  // }
+  acceptedTypes
+    .map((type) => MIMETypeToHandlerMapping[type] || type)
+    .some((type) => {
+      // Invalid type
+      if (!urlStruct[type]) {
+        return false;
+      }
+      const handlerMap = urlStruct[type][method];
+      // Invalid method
+      if (!handlerMap) {
+        return false;
+      }
+      const _handler = handlerMap[pathname];
+      // Found handler
+      if (_handler instanceof Function) {
+        handler = _handler;
+        return true; // This will stop the iteration
+      }
+      return false;
+    });
+
   // Assign default handler
   if (!handler) {
     handler = urlStruct.default;
   }
 
-  console.log("handler", handler);
-
-  handler(request, response, params);
+  handler(request, response); // Updated this line
 };
 
 http.createServer(onRequest).listen(port, () => {

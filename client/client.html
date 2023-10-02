@@ -1,36 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <title>Our simple HTTP server</title>
-  <link rel="stylesheet" type="text/css" href="/style.css">
-  
-  <script>
+  <head>
+    <title>Our simple HTTP server</title>
+    <link rel="stylesheet" type="text/css" href="/style.css" />
 
-  </script>
-</head>
-<body>
-  <section id="top">
-    <h3>POST Status Code Tests</h3>
-    <form id="nameForm" action="/addUser" method="post">
-      <label for="name">Name: </label>
-      <input id="nameField" type="text" name="name" />
-      <label for="age">Age: </label>
-      <input id="ageField" type="number" name="age" min="0" max="100" step="1"/>
-      <input type="submit" value="Add User" />
-    </form>
-    <form id="userForm" action="/getUsers" method="get">
-      <select id='urlField'>
-        <option value='/getUsers'>/getUsers</option>
-        <option value='/notReal'>/notReal</option>
-      </select>
-      <select id="methodSelect">
-        <option value="get">GET</option>
-        <option value="head">HEAD</option>
-      </select>
-      <input type="submit" value="Get User" />
-    </form>
-  </section>
-  <section id="content">
-  </section>
-</body>
+    <script>
+      const handleResponse = async (response, method) => {
+        const content = document.querySelector("#content");
+
+        switch (response.status) {
+          case 200:
+            content.innerHTML = `<b>Success</b>`;
+            break;
+          case 201:
+            content.innerHTML = `<b>Created</b>`;
+            break;
+          case 204:
+            content.innerHTML = `<b>Updated(No Content)</b>`;
+            break;
+          case 400:
+            content.innerHTML = `<b>Bad Request</b>`;
+            break;
+          case 404:
+          default:
+            content.innerHTML = `<b>Not Found</b>`;
+            break;
+        }
+
+        const contentType = response.headers.get("content-type");
+        // No content is needed to be parsed. Let's bail out.
+        if (method == "HEAD" || response.status === 204) {
+          return;
+        }
+        // Parse content
+        if (contentType && contentType.includes("application/json")) {
+          const obj = await response.json();
+          console.log(obj);
+          if (obj.message) {
+            content.innerHTML += `<p>${obj.message}</p>`;
+          } else if (obj.users) {
+            content.innerHTML += `<p>${JSON.stringify(obj.users)}</p>`;
+          } else {
+            content.innerHTML += `<p>${JSON.stringify(obj)}</p>`;
+          }
+        } else {
+          console.error("Unhandled content type:", contentType);
+        }
+      };
+
+      const sendRequest = (url, method, body) => {
+        fetch(url, {
+          method,
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body,
+        })
+          .then((response) => handleResponse(response, method))
+          .catch((error) => {
+            console.error("Error:", error);
+            const content = document.querySelector("#content");
+            content.innerHTML = `<b>Error: ${error.message}</b>`;
+          });
+      };
+
+      const init = () => {
+        const nameForm = document.querySelector("#nameForm");
+        const userForm = document.querySelector("#userForm");
+
+        nameForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const name = document.querySelector("#nameField").value;
+          const age = document.querySelector("#ageField").value;
+          sendRequest("/addUser", "POST", JSON.stringify({ name, age }));
+        });
+
+        userForm.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const urlField = document.querySelector("#urlField").value;
+          const method = document.querySelector("#methodSelect").value.toUpperCase();
+          sendRequest(urlField, method);
+        });
+      };
+
+      window.onload = init;
+    </script>
+  </head>
+  <body>
+    <section id="top">
+      <h3>POST Status Code Tests</h3>
+      <form id="nameForm" action="/addUser" method="post">
+        <label for="name">Name: </label>
+        <input id="nameField" type="text" name="name" />
+        <label for="age">Age: </label>
+        <input id="ageField" type="number" name="age" min="0" max="100" step="1" />
+        <input type="submit" value="Add User" />
+      </form>
+      <form id="userForm" action="/getUsers" method="get">
+        <select id="urlField">
+          <option value="/getUsers">/getUsers</option>
+          <option value="/notReal">/notReal</option>
+        </select>
+        <select id="methodSelect">
+          <option value="get">GET</option>
+          <option value="head">HEAD</option>
+        </select>
+        <input type="submit" value="Get User" />
+      </form>
+    </section>
+    <section id="content"></section>
+  </body>
 </html>

@@ -1,73 +1,68 @@
-// function to respond with a json object
-// takes request, response, status code and object to send
+const users = require('./users.js');
+
 const respondJSON = (request, response, status, object) => {
-  response.writeHead(status, { "Content-Type": "application/json" });
+  response.writeHead(status, { 'Content-Type': 'application/json' });
   response.write(JSON.stringify(object));
   response.end();
 };
 
-// Define handlers for various JSON responses
-const getSuccess = (request, response) => {
+const respondJSONMeta = (request, response, status) => {
+  response.writeHead(status, { 'Content-Type': 'application/json' });
+  response.end();
+};
+
+const getUsersGET = (request, response) => {
+  respondJSON(request, response, 200, { users: users.getUsers() });
+};
+
+const getUsersHEAD = (request, response) => {
+  respondJSONMeta(request, response, 200);
+};
+
+const notRealGET = (request, response) => {
   const responseJSON = {
-    message: "This is a successful response",
+    message: 'The page you are looking for was not found.',
+    id: 'notFound',
   };
-
-  respondJSON(request, response, 200, responseJSON);
+  respondJSON(request, response, 404, responseJSON);
 };
 
-const getBadRequest = (request, response, params) => {
-  const responseJSON =
-    params.valid === "true"
-      ? { message: "This request has the required parameters" }
-      : { message: "Missing valid query parameter set to true", id: "badRequest" };
-
-  const statusCode = params.valid === "true" ? 200 : 400;
-
-  respondJSON(request, response, statusCode, responseJSON);
+const notRealHEAD = (request, response) => {
+  respondJSONMeta(request, response, 404);
 };
 
-const getUnauthorized = (request, response, params) => {
-  const responseJSON =
-    params.loggedIn === "yes"
-      ? { message: "You are authorized" }
-      : { message: "Missing loggedIn query parameter set to yes", id: "unauthorized" };
+const addUserPOST = (request, response) => {
+  let body = '';
 
-  const statusCode = params.loggedIn === "yes" ? 200 : 401;
+  // Event listener for data chunks
+  request.on('data', (chunk) => {
+    body += chunk;
+  });
 
-  respondJSON(request, response, statusCode, responseJSON);
-};
+  // Event listener for end of data
+  request.on('end', () => {
+    // Parse the body to get the user object
+    const userObj = JSON.parse(body);
+    const status = users.addUser(userObj);
 
-const getForbidden = (request, response) => {
-  const responseJSON = {
-    message: "You do not have access to this content.",
-    id: "forbidden",
-  };
-
-  respondJSON(request, response, 403, responseJSON);
-};
-
-const getInternal = (request, response) => {
-  const responseJSON = {
-    message: "Internal Server Error. Something went wrong.",
-    id: "internalError",
-  };
-
-  respondJSON(request, response, 500, responseJSON);
-};
-
-const getNotImplemented = (request, response) => {
-  const responseJSON = {
-    message: "A get request for this page has not been implemented yet. Check again later for updated content.",
-    id: "notImplemented",
-  };
-
-  respondJSON(request, response, 501, responseJSON);
+    if (status === 400) {
+      respondJSON(request, response, 400, {
+        message: 'Name and age are both required',
+        id: 'addUserMissingParams',
+      });
+    } else if (status === 204) {
+      // There is no response body in a 204 message
+      respondJSONMeta(request, response, 204);
+    } else {
+      respondJSON(request, response, 201, { message: 'Created successfully' });
+    }
+  });
 };
 
 const getNotFound = (request, response) => {
   const responseJSON = {
-    message: "The page you are looking for was not found.",
-    id: "notFound",
+    message: 'The page you are looking for was not found.',
+    id: 'notFound',
   };
 
   respondJSON(request, response, 404, responseJSON);
@@ -75,11 +70,10 @@ const getNotFound = (request, response) => {
 
 // Export handlers
 module.exports = {
-  getSuccess,
-  getBadRequest,
-  getUnauthorized,
-  getForbidden,
-  getInternal,
-  getNotImplemented,
+  getUsersGET,
+  getUsersHEAD,
+  notRealGET,
+  notRealHEAD,
+  addUserPOST,
   getNotFound,
 };
